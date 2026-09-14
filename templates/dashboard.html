@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Dashboard — BTC Alerts</title>
+
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <header class="navbar">
+        <div class="container nav-content">
+
+            <a href="/" class="logo">
+                ₿ BTC Alerts
+            </a>
+
+            <nav class="nav-links">
+                <a href="/">Inicio</a>
+                <a href="#" id="logout-link">Cerrar sesión</a>
+            </nav>
+
+        </div>
+    </header>
+
+
+    <main class="dashboard-page">
+
+        <div class="container">
+
+            <div class="dashboard-header">
+
+                <div>
+                    <p class="dashboard-label">PANEL DE USUARIO</p>
+
+                    <h1>Mi Dashboard</h1>
+
+                    <p>
+                        Administra tu suscripción y tus alertas de Bitcoin.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <section class="dashboard-grid">
+
+
+                <!-- CUENTA -->
+
+                <div class="dashboard-card">
+
+                    <div class="card-icon">
+                        👤
+                    </div>
+
+                    <h2>Mi cuenta</h2>
+
+                    <div class="dashboard-info">
+
+                        <div>
+                            <span>Email</span>
+                            <strong id="user-email">Cargando...</strong>
+                        </div>
+
+                        <div>
+                            <span>ID de usuario</span>
+                            <strong id="user-id">Cargando...</strong>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- SUSCRIPCIÓN -->
+
+                <div class="dashboard-card">
+
+                    <div class="card-icon">
+                        💳
+                    </div>
+
+                    <h2>Suscripción</h2>
+
+                    <div class="dashboard-info">
+
+                        <div>
+                            <span>Estado</span>
+
+                            <strong
+                                id="subscription-status"
+                                class="status inactive"
+                            >
+                                Cargando...
+                            </strong>
+                        </div>
+
+                        <div>
+                            <span>Vencimiento</span>
+
+                            <strong id="subscription-expires">
+                                —
+                            </strong>
+                        </div>
+
+                    </div>
+
+                    <button class="btn btn-primary btn-full">
+                        Ver planes
+                    </button>
+
+                </div>
+
+
+                <!-- ALERTAS -->
+
+                <div class="dashboard-card">
+
+                    <div class="card-icon">
+                        🔔
+                    </div>
+
+                    <h2>Alertas</h2>
+
+                    <div class="dashboard-info">
+
+                        <div>
+                            <span>Estado</span>
+
+                            <strong id="alerts-status">
+                                Cargando...
+                            </strong>
+                        </div>
+
+                    </div>
+
+                    <button
+                        id="alerts-button"
+                        class="btn btn-primary btn-full"
+                    >
+                        Configurar alertas
+                    </button>
+
+                </div>
+
+
+                <!-- TELEGRAM -->
+
+                <div class="dashboard-card">
+
+                    <div class="card-icon">
+                        📱
+                    </div>
+
+                    <h2>Telegram</h2>
+
+                    <div class="dashboard-info">
+
+                        <div>
+                            <span>Estado</span>
+
+                            <strong>
+                                No conectado
+                            </strong>
+                        </div>
+
+                    </div>
+
+                    <button class="btn btn-primary btn-full">
+                        Conectar Telegram
+                    </button>
+
+                </div>
+
+            </section>
+
+
+            <!-- ÚLTIMA SEÑAL -->
+
+            <section class="signal-section">
+
+                <div class="section-header">
+
+                    <div>
+                        <p class="dashboard-label">
+                            BTC / USDT
+                        </p>
+
+                        <h2>Última señal</h2>
+                    </div>
+
+                </div>
+
+
+                <div class="signal-card">
+
+                    <div class="signal-price">
+
+                        <span>Precio BTC</span>
+
+                        <strong>
+                            $73,025.15
+                        </strong>
+
+                    </div>
+
+
+                    <div class="signal-direction">
+
+                        <span>Señal</span>
+
+                        <strong class="signal-down">
+                            ↓ BAJA
+                        </strong>
+
+                    </div>
+
+
+                    <div class="signal-probability">
+
+                        <span>Probabilidad</span>
+
+                        <strong>
+                            78.03%
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- HISTORIAL -->
+
+            <section class="history-section">
+
+                <div class="section-header">
+
+                    <div>
+                        <p class="dashboard-label">
+                            ALERTAS
+                        </p>
+
+                        <h2>Historial de señales</h2>
+                    </div>
+
+                </div>
+
+
+                <div class="history-card">
+
+                    <div class="history-row history-header">
+
+                        <span>Fecha</span>
+                        <span>Precio</span>
+                        <span>Señal</span>
+                        <span>Probabilidad</span>
+
+                    </div>
+
+
+                    <div class="history-row">
+
+                        <span>—</span>
+                        <span>—</span>
+                        <span>—</span>
+                        <span>—</span>
+
+                    </div>
+
+
+                    <div class="history-empty">
+
+                        Todavía no hay señales registradas.
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+
+    </main>
+
+
+    <footer class="footer">
+
+        <div class="container">
+
+            <p>
+                © 2026 BTC Alerts. Todos los derechos reservados.
+            </p>
+
+        </div>
+
+    </footer>
+
+
+    <script>
+
+        async function loadDashboard() {
+
+            try {
+
+                const response = await fetch("/auth/me");
+
+                if (!response.ok) {
+
+                    window.location.href = "/login";
+                    return;
+
+                }
+
+                const user = await response.json();
+
+
+                document.getElementById("user-email").textContent =
+                    user.email;
+
+                document.getElementById("user-id").textContent =
+                    user.user_id;
+
+
+                const subscriptionStatus =
+                    document.getElementById("subscription-status");
+
+                subscriptionStatus.textContent =
+                    user.subscription_status;
+
+
+                if (user.subscription_status === "ACTIVE") {
+
+                    subscriptionStatus.classList.remove("inactive");
+                    subscriptionStatus.classList.add("active");
+
+                }
+
+
+                if (user.subscription_expires) {
+
+                    const date = new Date(
+                        user.subscription_expires
+                    );
+
+                    document.getElementById(
+                        "subscription-expires"
+                    ).textContent =
+                        date.toLocaleDateString("es-BO");
+
+                }
+
+
+                const alertsStatus =
+                    document.getElementById("alerts-status");
+
+
+                if (user.alerts_enabled) {
+
+                    alertsStatus.textContent =
+                        "Activadas";
+
+                } else {
+
+                    alertsStatus.textContent =
+                        "Desactivadas";
+
+                }
+
+            } catch (error) {
+
+                window.location.href = "/login";
+
+            }
+
+        }
+
+
+        document.getElementById("logout-link")
+            .addEventListener("click", async function(event) {
+
+                event.preventDefault();
+
+                await fetch("/auth/logout", {
+                    method: "POST"
+                });
+
+                window.location.href = "/login";
+
+            });
+
+
+        loadDashboard();
+
+    </script>
+
+</body>
+</html>
