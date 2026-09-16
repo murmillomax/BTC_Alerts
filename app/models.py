@@ -51,7 +51,7 @@ class User(Base):
 
     subscription_status: Mapped[str] = mapped_column(
         String(20),
-        default="TRIAL",
+        default="PENDING",
         nullable=False
     )
 

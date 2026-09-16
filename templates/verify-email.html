@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Verificar email — BTC Alerts</title>
+
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <header class="navbar">
+        <div class="container nav-content">
+
+            <a href="/" class="logo">
+                ₿ BTC Alerts
+            </a>
+
+            <nav class="nav-links">
+                <a href="/">Inicio</a>
+                <a href="/#como-funciona">Cómo funciona</a>
+                <a href="/#planes">Planes</a>
+                <a href="/login">Iniciar sesión</a>
+            </nav>
+
+        </div>
+    </header>
+
+
+    <main class="auth-page">
+
+        <div class="auth-card">
+
+            <div class="auth-header">
+
+                <div class="auth-icon">✓</div>
+
+                <h1>Verifica tu email</h1>
+
+                <p>
+                    Hemos enviado un código de verificación de 6 dígitos a tu correo electrónico.
+                </p>
+
+            </div>
+
+
+            <form id="verify-form">
+
+                <div class="form-group">
+
+                    <label for="email">
+                        Email
+                    </label>
+
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        placeholder="tu@email.com"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="verification-code">
+                        Código de verificación
+                    </label>
+
+                    <input
+                        type="text"
+                        id="verification-code"
+                        name="verification-code"
+                        placeholder="123456"
+                        maxlength="6"
+                        inputmode="numeric"
+                        autocomplete="one-time-code"
+                        required
+                    >
+
+                </div>
+
+
+                <div id="verify-error" class="form-error"></div>
+
+                <div id="verify-success" class="form-success"></div>
+
+
+                <button
+                    type="submit"
+                    class="btn btn-primary btn-full"
+                >
+                    Verificar email
+                </button>
+
+            </form>
+
+
+            <div class="auth-footer">
+
+                <p>
+                    ¿Ya verificaste tu email?
+                    <a href="/login">
+                        Iniciar sesión
+                    </a>
+                </p>
+
+            </div>
+
+        </div>
+
+    </main>
+
+
+    <footer class="footer">
+
+        <div class="container">
+
+            <p>
+                © 2026 BTC Alerts. Todos los derechos reservados.
+            </p>
+
+        </div>
+
+    </footer>
+
+
+    <script>
+
+        const form = document.getElementById("verify-form");
+
+        const errorMessage =
+            document.getElementById("verify-error");
+
+        const successMessage =
+            document.getElementById("verify-success");
+
+
+        form.addEventListener("submit", async function(event) {
+
+            event.preventDefault();
+
+            errorMessage.textContent = "";
+            successMessage.textContent = "";
+
+
+            const email =
+                document.getElementById("email").value.trim();
+
+            const verificationCode =
+                document.getElementById("verification-code").value.trim();
+
+
+            try {
+
+                const response = await fetch("/auth/verify-email", {
+
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        email: email,
+                        verification_code: verificationCode
+                    })
+
+                });
+
+
+                const data = await response.json();
+
+
+                if (!response.ok) {
+
+                    errorMessage.textContent =
+                        data.detail || "Error al verificar el email";
+
+                    return;
+
+                }
+
+
+                successMessage.textContent =
+                    data.message;
+
+
+                document.querySelector(
+                    "#verify-form button"
+                ).disabled = true;
+
+
+                setTimeout(function() {
+
+                    window.location.href = "/login";
+
+                }, 2500);
+
+
+            } catch (error) {
+
+                errorMessage.textContent =
+                    "No se pudo conectar con el servidor.";
+
+            }
+
+        });
+
+    </script>
+
+</body>
+</html>

@@ -334,7 +334,10 @@
                     user.subscription_status;
 
 
-                if (user.subscription_status === "ACTIVE") {
+                if (
+                    user.subscription_status === "ACTIVE" ||
+                    user.subscription_status === "TRIAL"
+                ) {
 
                     subscriptionStatus.classList.remove("inactive");
                     subscriptionStatus.classList.add("active");

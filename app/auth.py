@@ -1,8 +1,10 @@
 import bcrypt
 import secrets
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from dateutil.relativedelta import relativedelta
+
+from .time_utils import utc_now
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr
@@ -11,6 +13,7 @@ from sqlalchemy.orm import Session
 from .database import SessionLocal
 from .models import User
 
+from .email import send_verification_email
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
 
@@ -54,7 +57,7 @@ def register(
     verification_code = f"{secrets.randbelow(1000000):06d}"
 
     verification_expires = (
-        datetime.now(timezone.utc) + timedelta(minutes=15)
+        utc_now() + timedelta(minutes=15)
     )
 
     user = User(
@@ -71,11 +74,100 @@ def register(
     db.commit()
     db.refresh(user)
 
+    try:
+        send_verification_email(
+            recipient=user.email,
+            verification_code=verification_code
+        )
+    except Exception as e:
+        db.delete(user)
+        db.commit()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo enviar el correo de verificación: {str(e)}"
+        )
+
     return {
-        "message": "Usuario registrado correctamente",
+        "message": "Usuario registrado correctamente. Revisa tu correo para verificar tu cuenta.",
         "user_id": user.id,
         "email": user.email
     }
+
+#--------------- Verify Email ----------------------
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    verification_code: str
+
+
+@router.post("/verify-email")
+def verify_email(
+    data: VerifyEmailRequest,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(
+        User.email == data.email
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="Usuario no encontrado"
+        )
+
+    if user.email_verified:
+        raise HTTPException(
+            status_code=400,
+            detail="El email ya está verificado"
+        )
+
+    if not user.verification_code:
+        raise HTTPException(
+            status_code=400,
+            detail="No existe un código de verificación"
+        )
+
+    if not user.verification_expires:
+        raise HTTPException(
+            status_code=400,
+            detail="El código de verificación no tiene fecha de expiración"
+        )
+
+    if utc_now() > user.verification_expires:
+        raise HTTPException(
+            status_code=400,
+            detail="El código de verificación ha expirado"
+        )
+
+    if data.verification_code != user.verification_code:
+        raise HTTPException(
+            status_code=400,
+            detail="Código de verificación incorrecto"
+        )
+
+    user.email_verified = True
+
+    user.subscription_status = "TRIAL"
+
+    user.subscription_expires = (
+        utc_now() + relativedelta(months=3)
+    )
+
+    user.verification_code = None
+    user.verification_expires = None
+
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "message": "Email verificado correctamente. Tu período de prueba de 3 meses ha sido activado.",
+        "user_id": user.id,
+        "email": user.email,
+        "subscription_status": user.subscription_status,
+        "subscription_expires": user.subscription_expires
+    }
+
 #--------------- Login -----------------------------
 @router.post("/login")
 def login(

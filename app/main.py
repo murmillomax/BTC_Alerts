@@ -2,8 +2,9 @@ from fastapi import FastAPI, HTTPException, Request
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import models
-from .database import Base, engine
+from .database import Base, engine, SessionLocal
 from .auth import router as auth_router
+from .time_utils import utc_now
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -46,6 +47,14 @@ def login_page(request: Request):
     )
 
 
+@app.get("/verify-email")
+def verify_email_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="verify-email.html"
+    )
+
+
 @app.get("/health")
 def health():
     return {
@@ -63,7 +72,41 @@ def dashboard(request: Request):
             detail="No estás autenticado"
         )
 
-    return templates.TemplateResponse(
-        request=request,
-        name="dashboard.html"
-    )
+    db = SessionLocal()
+
+    try:
+        user = db.query(models.User).filter(
+            models.User.id == user_id
+        ).first()
+
+        if not user:
+            request.session.clear()
+
+            raise HTTPException(
+                status_code=401,
+                detail="Usuario no encontrado"
+            )
+
+        if not user.email_verified:
+            return templates.TemplateResponse(
+                request=request,
+                name="verify-email.html"
+            )
+
+        # Comprobar vencimiento de la suscripción
+        if (
+            user.subscription_expires is not None
+            and user.subscription_expires < utc_now()
+            and user.subscription_status in ["TRIAL", "ACTIVE"]
+        ):
+            user.subscription_status = "EXPIRED"
+            db.commit()
+            db.refresh(user)
+
+        return templates.TemplateResponse(
+            request=request,
+            name="dashboard.html"
+        )
+
+    finally:
+        db.close()
