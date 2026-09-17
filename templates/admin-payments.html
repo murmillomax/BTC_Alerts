@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>BTC Alerts - Pagos pendientes</title>
+
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <div class="container">
+        
+        <h1>Pagos pendientes</h1>
+
+        <p>
+            Panel administrativo de BTC Alerts
+        </p>
+
+        <p>
+            <strong>Administrador conectado:</strong>
+            {{ admin.email }}
+        </p>
+
+        {% if payments %}
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Referencia</th>
+                        <th>Usuario</th>
+                        <th>Plan</th>
+                        <th>Monto</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Usuario reportó pago</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for payment, user in payments %}
+
+                    <tr>
+                        <td>
+                            {{ payment.reference }}
+                        </td>
+
+                        <td>
+                            {{ user.email }}
+                        </td>
+                        
+                        <td>
+                            {{ plans[payment.plan_id]["name"] }}
+                        </td>
+
+                        <td>
+                            {{ plans[payment.plan_id]["price_usdt"] }} USDT
+                            /
+                            {{ plans[payment.plan_id]["price_bob"] }} Bs
+                        </td>
+
+                        <td>
+                            {{ payment.created_at }}
+                        </td>
+
+                        <td>
+                            {{ payment.status }}
+                        </td>
+
+                        <td>
+                            {% if payment.user_reported_paid %}
+                                SÍ
+                            {% else %}
+                                NO
+                            {% endif %}
+                        </td>
+
+                        <td>
+
+                            <form
+                                method="post"
+                                action="/admin/payments/{{ payment.id }}/approve"
+                            >
+
+                                <button type="submit">
+                                    Aprobar
+                                </button>
+
+                            </form>
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+            </table>
+
+        {% else %}
+
+            <p>
+                No hay pagos pendientes.
+            </p>
+
+        {% endif %}
+
+        <p>
+            <a href="/dashboard">Volver al dashboard</a>
+        </p>
+
+    </div>
+
+</body>
+</html>

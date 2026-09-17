@@ -155,6 +155,42 @@
 
                 </div>
 
+                <div
+                    id="report-paid-section"
+                    style="
+                        margin-top: 25px;
+                        padding: 20px;
+                        border: 1px solid;
+                        border-radius: 10px;
+                    "
+                >
+
+                    <p>
+                        <strong>¿Ya realizaste el pago?</strong>
+                    </p>
+
+                    <p>
+                        Si ya realizaste el pago, indícalo para que el
+                        administrador pueda verificarlo.
+                    </p>
+
+                    <button
+                        type="button"
+                        id="report-paid-button"
+                        class="btn btn-primary btn-full"
+                    >
+                        YA REALICÉ EL PAGO
+                    </button>
+
+                    <p
+                        id="reported-paid-message"
+                        style="display: none;"
+                    >
+                        Has indicado que realizaste el pago.
+                        El administrador debe verificarlo.
+                    </p>
+
+                </div>
 
                 <div class="payment-status">
 
@@ -232,6 +268,23 @@
             document.getElementById("payment-status").textContent =
                 paymentData.status;
 
+            const reportButton =
+                document.getElementById("report-paid-button");
+
+            const reportedMessage =
+                document.getElementById("reported-paid-message");
+
+            if (paymentData.user_reported_paid) {
+
+                reportButton.style.display = "none";
+                reportedMessage.style.display = "block";
+
+            } else {
+
+                reportButton.style.display = "block";
+                reportedMessage.style.display = "none";
+
+            }   
 
             if (plan.months === null) {
 
@@ -248,6 +301,36 @@
 
         }
 
+        document.getElementById("report-paid-button")
+            .addEventListener("click", async function() {
+
+                const button = this;
+
+                button.disabled = true;
+                button.textContent = "Registrando...";
+
+                const response = await fetch(
+                    `/payment/${paymentData.id}/report-paid`,
+                    {
+                        method: "POST"
+                    }
+                );
+
+                if (response.ok) {
+
+                    window.location.reload();
+
+                } else {
+
+                    button.disabled = false;
+                    button.textContent = "YA REALICÉ EL PAGO";
+
+                    alert(
+                        "No se pudo registrar el pago. Intenta nuevamente."
+                    );
+                }
+
+            });
 
         document.getElementById("logout-link")
             .addEventListener("click", async function(event) {

@@ -55,6 +55,11 @@ class User(Base):
         nullable=False
     )
 
+    subscription_started: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True
+    )
+
     subscription_expires: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True
@@ -63,6 +68,12 @@ class User(Base):
     alerts_enabled: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
+        nullable=False
+    )
+
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
         nullable=False
     )
 
@@ -123,6 +134,20 @@ class Payment(Base):
     )
 
     paid_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True
+    )
+
+    user_reported_paid: Mapped[bool] = mapped_column(
+        Boolean, default=False,
+        nullable=False
+    )
+    user_reported_paid_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True
+    )
+
+    approved_at: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True
     )
