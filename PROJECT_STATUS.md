@@ -1,67 +1,94 @@
 BTC Alerts — PROJECT STATUS
 
-1. Estado del proyecto
+Última actualización: 16/09/2026
+Estado: Desarrollo local
+Ruta: D:\Python\BTC_Alerts
 
-Proyecto: BTC Alerts
-Tipo: Plataforma web de alertas de Bitcoin
-Stack: Python + FastAPI + SQLite + SQLAlchemy + Jinja2
-Entorno actual: Desarrollo local
-Ruta local:
+1. Información general
+Elemento	Valor
+Proyecto	BTC Alerts
+Tipo	Plataforma web de alertas de Bitcoin
+Stack	Python + FastAPI + SQLite + SQLAlchemy + Jinja2
+Entorno	Desarrollo local
+Base de datos	btc_alerts.db
+Servidor	Uvicorn
+Autenticación	bcrypt + SessionMiddleware
+Email	Gmail SMTP
+Regla crítica de desarrollo
 
-D:\Python\BTC_Alerts
+La base de datos existente debe conservarse.
 
-2. Arquitectura actual
+NO hacer:
 
-La aplicación utiliza:
+DELETE btc_alerts.db
 
-FastAPI
+Tampoco:
 
-Uvicorn
+eliminar la base de datos
+recrearla
+resetearla
+reemplazarla
+borrar registros históricos de pagos
+2. Arquitectura
+BTC Alerts
+│
+├── FastAPI
+├── Uvicorn
+├── SQLAlchemy
+├── SQLite
+├── Jinja2
+├── bcrypt
+├── Starlette SessionMiddleware
+├── python-dotenv
+└── Gmail SMTP
+Archivos principales
+app/
+├── main.py
+├── auth.py
+├── models.py
+├── database.py
+├── email.py
+├── time_utils.py
+└── payments/
+    └── bybit.py
+Templates
+templates/
+├── index.html
+├── login.html
+├── verify-email.html
+├── dashboard.html
+├── plans.html
+└── payment.html
+Recursos QR
+static/qr/
+├── bcp_monthly.jpg
+├── bcp_semiannual.jpg
+├── bcp_annual.jpg
+└── bcp_lifetime.jpg
+Configuración
+.env
 
-SQLAlchemy
-
-SQLite
-
-Jinja2
-
-bcrypt
-
-Starlette SessionMiddleware
-
-python-dotenv
-
-SMTP Gmail para envío de correos
-
-Base de datos:
-
-btc_alerts.db
-
-IMPORTANTE: btc_alerts.db no debe eliminarse, recrearse, resetearse ni reemplazarse durante el desarrollo.
+El .env contiene credenciales y NO debe publicarse en GitHub.
 
 3. Autenticación
+3.1 Registro
 
-Registro
-
-Estado: COMPLETADO
+Estado: COMPLETADO Y PROBADO
 
 Implementado:
 
-Registro mediante email y contraseña.
+Registro mediante email y contraseña
+Hash de contraseña mediante bcrypt
+Verificación obligatoria del email
+Código de verificación de 6 dígitos
+Código válido durante 15 minutos
 
-Contraseña almacenada mediante hash bcrypt.
-
-Verificación de email obligatoria.
-
-Generación automática de código de verificación de 6 dígitos.
-
-Código válido durante 15 minutos.
-
-Usuario creado inicialmente con:
+Estado inicial del usuario:
 
 email_verified = False
 subscription_status = PENDING
-
-Verificación de email
+subscription_expires = None
+3.2 Verificación de email
 
 Estado: COMPLETADO Y PROBADO
 
@@ -69,11 +96,11 @@ Endpoint:
 
 POST /auth/verify-email
 
-Página web:
+Página:
 
 /verify-email
 
-Proceso:
+Flujo:
 
 Registro
    ↓
@@ -93,7 +120,7 @@ subscription_status = TRIAL
    ↓
 Trial de 3 meses
 
-Al verificar correctamente:
+Después de verificar:
 
 email_verified = True
 subscription_status = TRIAL
@@ -101,13 +128,13 @@ subscription_expires = fecha de verificación + 3 meses
 verification_code = None
 verification_expires = None
 
-La fecha de expiración del trial utiliza meses calendario mediante relativedelta.
+La expiración del trial utiliza meses calendario mediante relativedelta.
 
 4. Email SMTP
 
 Estado: COMPLETADO Y PROBADO
 
-Proveedor actual:
+Proveedor:
 
 Gmail SMTP
 
@@ -119,29 +146,26 @@ SMTP_USERNAME=...
 SMTP_PASSWORD=...
 SMTP_FROM=...
 
-Las credenciales se encuentran en:
+Las credenciales están almacenadas en:
 
 .env
-
-El archivo .env no debe publicarse en GitHub.
-
-SMTP probado correctamente:
-
+Prueba SMTP
 Conectando a Gmail SMTP...
 STARTTLS correcto.
 Autenticación correcta.
 Correo enviado correctamente.
 PRUEBA SMTP COMPLETADA.
 
-Se comprobó posteriormente el envío real de códigos de verificación.
+También se comprobó el envío real de códigos de verificación.
 
 Observación
 
-Hotmail puede clasificar el correo de BTC Alerts como Spam.
+Hotmail puede clasificar los mensajes de BTC Alerts como Spam.
 
-Esto no representa actualmente un fallo del sistema SMTP: el correo fue recibido correctamente en la carpeta Spam.
+El envío SMTP funciona correctamente; el problema observado corresponde a la clasificación del correo por parte del proveedor receptor.
 
-5. Login
+5. Login y sesiones
+5.1 Login
 
 Estado: COMPLETADO Y PROBADO
 
@@ -149,32 +173,22 @@ Endpoint:
 
 POST /auth/login
 
-La autenticación:
+Proceso:
 
-Busca el usuario por email.
-
-Comprueba la contraseña mediante bcrypt.
-
-Crea la sesión mediante SessionMiddleware.
-
-Guarda user_id en la sesión.
-
-Prueba realizada correctamente.
-
-Respuesta:
-
-{
-  "message": "Login correcto",
-  "user_id": 5,
-  "email": "daltonmax_42@hotmail.com",
-  "subscription_status": "TRIAL"
-}
-
-6. Sesiones
+Email
+   ↓
+Buscar usuario
+   ↓
+Verificar contraseña con bcrypt
+   ↓
+Crear sesión
+   ↓
+Guardar user_id
+5.2 Sesiones
 
 Estado: FUNCIONANDO
 
-Actualmente se utiliza:
+Tecnología:
 
 Starlette SessionMiddleware
 
@@ -189,8 +203,7 @@ POST /auth/logout
 Al cerrar sesión:
 
 request.session.clear()
-
-7. Endpoint /auth/me
+6. Endpoint /auth/me
 
 Estado: COMPLETADO Y PROBADO
 
@@ -198,17 +211,14 @@ Endpoint:
 
 GET /auth/me
 
-Devuelve actualmente:
+Devuelve información del usuario autenticado:
 
-{
-  "user_id": 5,
-  "email": "daltonmax_42@hotmail.com",
-  "subscription_status": "TRIAL",
-  "subscription_expires": "2026-12-15T17:50:44.089681",
-  "alerts_enabled": true
-}
-
-8. Dashboard
+user_id
+email
+subscription_status
+subscription_expires
+alerts_enabled
+7. Dashboard
 
 Estado: FUNCIONANDO
 
@@ -216,148 +226,404 @@ Página:
 
 /dashboard
 
-El dashboard actualmente muestra:
+Actualmente muestra:
 
-Email del usuario
-
-ID del usuario
-
+Email
+ID de usuario
 Estado de suscripción
-
 Fecha de vencimiento
-
 Estado de alertas
-
 Estado de Telegram
-
 Última señal BTC/USDT
-
 Historial de señales
+Señales BTC
 
-Actualmente algunos datos de señales todavía son datos de demostración.
+Actualmente algunos datos todavía son de demostración.
 
-Ejemplo actual:
+Ejemplo:
 
 Precio BTC: $73,025.15
 Señal: ↓ BAJA
 Probabilidad: 78.03%
 
-Estos datos deberán posteriormente conectarse con el sistema real de señales BTC.
+Posteriormente deberán conectarse al sistema real de señales BTC.
 
-9. Protección del Dashboard
+8. Protección del Dashboard
 
 Estado: COMPLETADO Y PROBADO
 
-El backend ya verifica la sesión y consulta al usuario en la base de datos antes de entregar el dashboard.
+El backend verifica:
 
-Flujo actual:
+1. Existencia de sesión
+2. Existencia del usuario
+3. Verificación del email
+4. Vencimiento de la suscripción
 
-/dashboard
-      ↓
-¿Existe sesión?
-      │
-      ├── NO → HTTP 401
-      │
-      └── SÍ
-           ↓
-     ¿Existe usuario?
-           │
-           ├── NO → cerrar sesión → HTTP 401
-           │
-           └── SÍ
-                ↓
-        ¿Email verificado?
-                │
-                ├── NO → verify-email.html
-                │
-                └── SÍ → dashboard.html
-
-Prueba realizada con usuario no verificado:
-
-email_verified = False
-subscription_status = PENDING
-
-Resultado:
+Flujo:
 
 /dashboard
-      ↓
-Verifica tu email
+     │
+     ├── Sin sesión
+     │      └── HTTP 401
+     │
+     └── Con sesión
+            │
+            ├── Usuario inexistente
+            │      └── Cerrar sesión → HTTP 401
+            │
+            └── Usuario existente
+                   │
+                   ├── Email no verificado
+                   │      └── verify-email.html
+                   │
+                   └── Email verificado
+                          └── dashboard.html
 
-Prueba realizada con usuario verificado:
+Pruebas realizadas:
 
-email_verified = True
-subscription_status = TRIAL
+PENDING / email no verificado → Verificación de email
+TRIAL / email verificado      → Dashboard
+9. Estados de suscripción
 
-Resultado:
-
-/dashboard
-      ↓
-Dashboard correctamente
-
-10. Estados actuales de suscripción
-
-Estados definidos:
+Estados actuales:
 
 PENDING
 TRIAL
 ACTIVE
 EXPIRED
-
 PENDING
 
-Usuario registrado pero email todavía no verificado.
+Usuario registrado pero email no verificado.
 
 TRIAL
 
-Email verificado y período de prueba de 3 meses activado. Tiene acceso al dashboard mientras no haya vencido.
+Email verificado y trial de 3 meses activado.
 
 ACTIVE
 
-Estado previsto para una suscripción de pago activa. La activación mediante pagos todavía no está implementada.
+Suscripción de pago activa.
+
+La activación administrativa todavía está pendiente.
 
 EXPIRED
 
-Cuando subscription_expires ha pasado y el estado es TRIAL o ACTIVE, el backend cambia automáticamente el estado a EXPIRED.
+La suscripción o trial ha vencido.
 
-11. Validación de vencimiento de suscripción
+10. Expiración de suscripciones
 
 Estado: COMPLETADO Y PROBADO A NIVEL DE LÓGICA
 
-El backend comprueba la sesión, la existencia del usuario, el email verificado y la fecha de vencimiento usando utc_now().
+La aplicación utiliza:
 
-Lógica implementada:
+utc_now()
 
-TRIAL + fecha vencida → EXPIRED
+ubicado en:
+
+app/time_utils.py
+
+Transiciones implementadas:
+
+TRIAL  + fecha vencida → EXPIRED
 ACTIVE + fecha vencida → EXPIRED
 
-La transición se ejecuta cuando subscription_expires < utc_now() y el estado actual es TRIAL o ACTIVE.
+Condición:
 
+subscription_expires < utc_now()
+
+si el estado actual es:
+
+TRIAL
+
+o:
+
+ACTIVE
 Prueba realizada
-
-Se comprobó la transición:
-
 ¿VENCIDA?: True
 ANTES: TRIAL
 DESPUES: EXPIRED
 
 El usuario real ID 5 fue comprobado y permaneció intacto.
 
-Próxima mejora
+Pendiente
+EXPIRED → /plans
 
-Restringir el acceso de los usuarios EXPIRED y dirigirlos a la página de planes.
+Los usuarios expirados deberán ser enviados a la página de planes y no podrán utilizar las funciones protegidas.
 
-12. Base de datos
+11. Sistema de planes
+
+Estado: COMPLETADO
+
+Página:
+
+/plans
+Planes actuales
+Plan	ID	Duración	USDT	Bs
+Mensual	monthly	1 mes	5	60
+Semestral	semiannual	6 meses	20	240
+Anual	annual	12 meses	30	360
+De por vida	lifetime	Sin vencimiento	100	1.200
+
+Tipo de cambio utilizado:
+
+1 USDT = 12 Bs
+Configuración
+
+Archivo:
+
+app/main.py
+PLANS = {
+    "monthly": {
+        "name": "Mensual",
+        "months": 1,
+        "price_usdt": 5,
+        "price_bob": 60
+    },
+    "semiannual": {
+        "name": "Semestral",
+        "months": 6,
+        "price_usdt": 20,
+        "price_bob": 240
+    },
+    "annual": {
+        "name": "Anual",
+        "months": 12,
+        "price_usdt": 30,
+        "price_bob": 360
+    },
+    "lifetime": {
+        "name": "De por vida",
+        "months": None,
+        "price_usdt": 100,
+        "price_bob": 1200
+    }
+}
+
+Endpoint:
+
+GET /plans
+12. Solicitudes de pago
+
+Estado: IMPLEMENTADO Y PROBADO
+
+Cada solicitud genera una referencia única de:
+
+8 caracteres
+
+Formato:
+
+A-Z
+0-9
+
+Ejemplo:
+
+X7K2P9QM
+
+La referencia identifica internamente la solicitud.
+
+12.1 Datos de payments
+id
+reference
+user_id
+plan_id
+amount
+currency
+status
+created_at
+expires_at
+paid_at
+
+Estado inicial:
+
+PENDING
+12.2 Expiración de pagos
+
+Las solicitudes de pago NO expiran automáticamente.
+
+Si el usuario no paga:
+
+PENDING
+
+permanece almacenado.
+
+El historial de pagos es permanente.
+
+13. Regla de solicitudes pendientes
+
+Estado: COMPLETADO Y PROBADO
+
+Un usuario puede tener como máximo:
+
+1 solicitud PENDING
+Mismo plan
+
+Si el usuario vuelve a seleccionar el mismo plan:
+
+PENDING existente
+       ↓
+Reutilizar
+
+No se crea:
+
+Nueva referencia
+Nuevo registro
+Nuevo pago
+Cambio de plan
+
+Si el usuario selecciona otro plan:
+
+PENDING anterior
+       ↓
+CANCELLED
+       ↓
+Nueva solicitud
+       ↓
+PENDING
+
+La nueva solicitud obtiene:
+
+Nuevo plan
+Nuevo monto
+Nueva referencia
+Objetivo
+
+Evitar:
+
+múltiples pagos pendientes
+referencias simultáneas
+confusión entre planes
+activación accidental del plan incorrecto
+14. Página de pago
+
+Estado: COMPLETADA Y PROBADA VISUALMENTE
+
+Ruta:
+
+/subscribe/{plan_id}
+
+Ejemplo:
+
+/subscribe/monthly
+
+La página muestra:
+
+Nombre del plan
+Duración
+Precio USDT
+Equivalente Bs
+Referencia
+QR
+Estado del pago
+Instrucciones
+Botón Dashboard
+
+Los usuarios en TRIAL pueden acceder correctamente.
+
+15. QR BCP
+
+Estado: COMPLETADO Y PROBADO
+
+Proveedor actual:
+
+BCP
+
+Ubicación:
+
+D:\Python\BTC_Alerts\static\qr
+
+Archivos:
+
+bcp_monthly.jpg
+bcp_semiannual.jpg
+bcp_annual.jpg
+bcp_lifetime.jpg
+
+Correspondencia:
+
+monthly
+    → /static/qr/bcp_monthly.jpg
+
+semiannual
+    → /static/qr/bcp_semiannual.jpg
+
+annual
+    → /static/qr/bcp_annual.jpg
+
+lifetime
+    → /static/qr/bcp_lifetime.jpg
+
+La selección se realiza automáticamente mediante:
+
+plan_id
+
+El QR se muestra alineado a la izquierda dentro de la tarjeta de pago.
+
+Limitación
+
+El QR BCP no permite introducir nuestra referencia de 8 caracteres como referencia editable.
+
+Por lo tanto:
+
+Referencia BTC Alerts
+        ↓
+Identificador interno
+16. Pagos realizados por terceros
+
+El sistema debe permitir:
+
+Usuario A
+    ↓
+Genera solicitud
+    ↓
+Referencia X7K2P9QM
+    ↓
+Persona B realiza el pago
+    ↓
+Administrador verifica
+    ↓
+Usuario A recibe la suscripción
+
+El pagador no tiene que ser el propietario de la cuenta.
+
+Por esta razón:
+
+El usuario se identifica mediante la solicitud.
+La referencia identifica la solicitud cuando el banco la permite.
+El comprobante puede utilizarse para verificación manual.
+El nombre del pagador no se utilizará como identificador automático.
+17. Bancos evaluados
+Banco Ganadero
+
+Estado: EVALUADO
+
+Permite introducir una referencia durante el pago.
+
+Puede utilizarse la referencia de BTC Alerts:
+
+X7K2P9QM
+
+Actualmente no está integrado en la página de pago.
+
+Banco Bisa
+
+Estado: EVALUADO
+
+El flujo probado no permite introducir una referencia personalizada.
+
+Por lo tanto, la referencia no puede ser el único mecanismo de identificación.
+
+La comprobación deberá realizarse mediante:
+
+Pago recibido
++
+Comprobante
++
+Datos de la transacción
+18. Base de datos
 
 Archivo:
 
 btc_alerts.db
-
-Tabla principal:
-
-users
-
-Campos actuales:
-
+Tabla users
 id
 email
 email_verified
@@ -368,66 +634,68 @@ created_at
 subscription_status
 subscription_expires
 alerts_enabled
-
-No realizar:
-
-DELETE btc_alerts.db
-
-No recrear la base de datos para resolver problemas de desarrollo.
-
-13. Modelo User
+Tabla payments
+id
+reference
+user_id
+plan_id
+amount
+currency
+status
+created_at
+expires_at
+paid_at
+Reglas
+NO eliminar btc_alerts.db
+NO recrear la base de datos
+NO borrar historial de pagos
+NO resetear datos durante el desarrollo
+19. Modelo User
 
 Archivo:
 
 app/models.py
 
-Estado actual:
+Estado inicial:
 
-subscription_status
-default = "PENDING"
+subscription_status = PENDING
+subscription_expires = None
 
-El cambio fue realizado para que nuevos usuarios comiencen correctamente en estado:
+Después de verificar email:
+
+subscription_status = TRIAL
+subscription_expires = +3 meses
+20. Modelo Payment
+
+Archivo:
+
+app/models.py
+
+Modelo:
+
+Payment
+
+Campos:
+
+id
+reference
+user_id
+plan_id
+amount
+currency
+status
+created_at
+expires_at
+paid_at
+
+Estado inicial:
 
 PENDING
 
-El registro actualmente establece explícitamente:
+La referencia es única:
 
-subscription_status = "PENDING"
-subscription_expires = None
-
-Después de verificar el email:
-
-subscription_status = "TRIAL"
-subscription_expires = +3 meses
-
-14. Archivos principales
-
-Backend
-
-app/main.py
-app/auth.py
-app/models.py
-app/database.py
-app/email.py
-app/time_utils.py
-
-Templates
-
-templates/index.html
-templates/login.html
-templates/verify-email.html
-templates/dashboard.html
-
-Configuración
-
-.env
-
-Base de datos
-
-btc_alerts.db
-
-15. Funciones completadas
-
+reference UNIQUE
+21. Funcionalidades completadas
 [OK] FastAPI
 [OK] SQLite
 [OK] SQLAlchemy
@@ -439,182 +707,285 @@ btc_alerts.db
 [OK] /auth/me
 [OK] Código de verificación de 6 dígitos
 [OK] Expiración del código a 15 minutos
-[OK] SMTP Gmail
+[OK] Gmail SMTP
 [OK] Envío real de emails
-[OK] Página /verify-email
+[OK] /verify-email
 [OK] Verificación de email
 [OK] PENDING → TRIAL
 [OK] Trial de 3 meses
-[OK] Protección del dashboard para emails no verificados
-[OK] Dashboard para usuarios verificados
-[OK] UTC centralizado mediante app/time_utils.py
-[OK] Detección automática de vencimiento
+[OK] Protección del dashboard
+[OK] UTC centralizado
+[OK] Detección de vencimiento
 [OK] TRIAL → EXPIRED
-[OK] ACTIVE → EXPIRED (lógica implementada)
+[OK] ACTIVE → EXPIRED
+[OK] /plans
+[OK] 4 planes
+[OK] Solicitudes de pago
+[OK] Referencia única de 8 caracteres
+[OK] Estado PENDING
+[OK] Reutilización de PENDING
+[OK] Cancelación al cambiar de plan
+[OK] Historial permanente
+[OK] /subscribe/{plan_id}
+[OK] QR BCP por plan
+[OK] Visualización del QR
+[OK] Pruebas visuales de página de pago
+22. Próximos pasos
+Prioridad 1 — Confirmación administrativa de pagos
 
-16. Próximos pasos
+Estado: PENDIENTE
 
-Prioridad 1 — Página de planes
+Crear una interfaz administrativa donde el administrador introduzca:
 
-Definir e implementar:
+Referencia de 8 caracteres
 
-PENDING
-TRIAL
-ACTIVE
-EXPIRED
+El sistema debe mostrar:
 
-y las reglas de acceso correspondientes.
+Usuario
+Email
+Plan
+Monto
+Moneda
+Referencia
+Estado
 
-Especialmente:
+Antes de confirmar.
 
-subscription_expires < fecha actual
+Confirmación
 
-→ suscripción vencida.
+Después de verificar manualmente el pago:
 
-Prioridad 2 — Planes
+Payment.status = PAID
+Payment.paid_at = utc_now()
 
-Implementar página de planes:
+Usuario:
+
+subscription_status = ACTIVE
+Duración
+Mensual      → +1 mes
+Semestral    → +6 meses
+Anual        → +12 meses
+De por vida  → subscription_expires = None
+
+Importante: el mecanismo de autorización del administrador todavía debe definirse. No existe actualmente un sistema administrativo implementado.
+
+Prioridad 2 — Restricción EXPIRED
+
+Estado: PENDIENTE
+
+Cuando:
+
+subscription_status = EXPIRED
+
+el usuario deberá ser dirigido a:
 
 /plans
 
-Definir:
+y no podrá utilizar funciones protegidas.
 
-Trial
+Prioridad 3 — Historial administrativo
 
-Plan mensual
+Estado: PENDIENTE
 
-Plan anual
+Crear una vista para consultar:
 
-Precio
+Pagos pendientes
+Pagos pagados
+Pagos cancelados
+Usuario
+Email
+Plan
+Monto
+Referencia
+Fecha de creación
+Fecha de pago
 
-Duración
+Los registros históricos no deben eliminarse.
 
-Estado de suscripción
+Prioridad 4 — Pagos automáticos
 
-Prioridad 3 — Pagos
+Estado: PENDIENTE
 
-Definir posteriormente el sistema de pagos y la activación automática de:
+Después de validar completamente el sistema manual:
 
-ACTIVE
+Evaluar proveedor
+       ↓
+Evaluar QR con referencia/glosa
+       ↓
+Evaluar webhooks
+       ↓
+Evaluar Bybit
+       ↓
+Automatizar confirmación
 
-Prioridad 4 — Alertas BTC
+La integración automática no debe implementarse antes de validar el flujo manual.
 
-Conectar el dashboard con el sistema real de señales BTC.
+Prioridad 5 — Alertas BTC reales
 
-Actualmente la señal mostrada en el dashboard es estática/de demostración.
+Estado: PENDIENTE
 
-Debe sustituirse posteriormente por:
+Sustituir los datos de demostración por:
 
 Precio actual
-
 Dirección de señal
-
 Probabilidad
-
 Fecha/hora
-
 Historial real
-
 Estado de alertas
+Prioridad 6 — Telegram
 
-Prioridad 5 — Telegram
+Estado: PENDIENTE
 
 Implementar:
 
 Conectar Telegram
-
-y posteriormente:
-
-Vinculación de cuenta
-
-Activación/desactivación
-
-Envío de alertas
-
-Estado de conexión
-
-17. Seguridad pendiente
+Vincular cuenta
+Activar/desactivar alertas
+Enviar alertas
+Mostrar estado de conexión
+23. Seguridad pendiente
 
 Antes de producción:
 
-Mover SessionMiddleware.secret_key a .env.
-
-Utilizar una clave secreta segura.
-
-Mantener .env fuera de GitHub.
-
-Revisar configuración HTTPS.
-
-Revisar cookies de sesión.
-
-Revisar protección CSRF donde corresponda.
-
-Revisar límites de intentos de login.
-
-Revisar recuperación de contraseña.
-
-Revisar seguridad del sistema de verificación de email.
-
-18. Estado actual resumido
-
+[ ] Mover SessionMiddleware.secret_key a .env
+[ ] Generar clave secreta segura
+[ ] Mantener .env fuera de GitHub
+[ ] Configurar HTTPS
+[ ] Revisar cookies de sesión
+[ ] Revisar protección CSRF
+[ ] Limitar intentos de login
+[ ] Implementar recuperación de contraseña
+[ ] Revisar seguridad del email verification
+[ ] Implementar autorización administrativa
+[ ] Proteger endpoints administrativos
+[ ] Revisar endpoints de pagos
+24. Estado general del proyecto
 BTC Alerts
 │
-├── Registro                  ✅
-├── Email verification       ✅
-├── SMTP                      ✅
-├── Login                     ✅
-├── Logout                    ✅
-├── Sessions                  ✅
-├── Dashboard                 ✅
-├── Protección dashboard      ✅
+├── AUTENTICACIÓN
+│   ├── Registro                  ✅
+│   ├── Email verification        ✅
+│   ├── SMTP                      ✅
+│   ├── Login                     ✅
+│   ├── Logout                    ✅
+│   └── Sessions                  ✅
 │
-├── Estados de suscripción   ✅
-├── UTC centralizado         ✅
-├── Expiración suscripción   ✅
-├── Planes                    ⏳ PENDIENTE
-├── Pagos                     ⏳ PENDIENTE
-├── Alertas reales            ⏳ PENDIENTE
-├── Telegram                  ⏳ PENDIENTE
-└── Seguridad producción      ⏳ PENDIENTE
-
-19. Última prueba realizada
+├── USUARIOS
+│   ├── /auth/me                  ✅
+│   ├── Dashboard                 ✅
+│   ├── Protección dashboard      ✅
+│   ├── Trial 3 meses             ✅
+│   └── Expiración                ✅
+│
+├── SUSCRIPCIONES
+│   ├── Estados                   ✅
+│   ├── Planes                    ✅
+│   ├── TRIAL → EXPIRED           ✅
+│   ├── ACTIVE → EXPIRED          ✅
+│   └── EXPIRED → /plans          ⏳
+│
+├── PAGOS
+│   ├── Solicitudes               ✅
+│   ├── Referencia 8 caracteres   ✅
+│   ├── PENDING                   ✅
+│   ├── Reutilización             ✅
+│   ├── Cancelación por cambio    ✅
+│   ├── Historial permanente      ✅
+│   ├── QR BCP                    ✅
+│   ├── Página de pago            ✅
+│   ├── Confirmación admin        ⏳
+│   └── Activación ACTIVE         ⏳
+│
+├── FUNCIONES BTC
+│   ├── Datos reales              ⏳
+│   ├── Alertas                   ⏳
+│   └── Historial real            ⏳
+│
+├── TELEGRAM
+│   ├── Vinculación                ⏳
+│   └── Alertas                    ⏳
+│
+└── PRODUCCIÓN
+    ├── Seguridad                  ⏳
+    ├── HTTPS                      ⏳
+    └── Pagos automáticos          ⏳
+25. Última prueba realizada
 
 Usuario de prueba:
 
 ID: 5
 Email: daltonmax_42@hotmail.com
 
-Estado después de verificación:
+Estado:
 
 email_verified = True
 subscription_status = TRIAL
 subscription_expires = 2026-12-15
 alerts_enabled = True
 
-Resultado:
+Pruebas realizadas:
 
-Login                 ✅
-/auth/me              ✅
-/dashboard            ✅
-Protección PENDING    ✅
-Verificación email    ✅
-Trial 3 meses         ✅
-Detección EXPIRED     ✅
-
-20. Regla de continuidad del proyecto
-
-No modificar ni eliminar funcionalidades que ya fueron probadas sin necesidad.
+Login                         ✅
+/auth/me                      ✅
+/dashboard                    ✅
+Protección PENDING            ✅
+Verificación email            ✅
+Trial 3 meses                 ✅
+Detección EXPIRED             ✅
+/plans                        ✅
+Creación solicitud de pago    ✅
+Referencia 8 caracteres       ✅
+Reutilización PENDING         ✅
+Cambio de plan                ✅
+Cancelación PENDING           ✅
+/subscribe/monthly            ✅
+QR BCP mensual                ✅
+QR BCP por plan               ✅
+Visualización QR              ✅
+26. Regla de continuidad del proyecto
 
 Antes de realizar cambios importantes:
 
-Revisar este PROJECT_STATUS.md.
+1. Revisar PROJECT_STATUS.md
+2. Identificar exactamente qué se modificará
+3. Mantener intacta la base de datos
+4. No eliminar datos históricos
+5. Realizar cambios pequeños
+6. Probar cada cambio
+7. Actualizar PROJECT_STATUS.md
+Regla principal
 
-Identificar exactamente qué parte se va a modificar.
+No modificar ni eliminar funcionalidades que ya fueron probadas sin necesidad.
 
-Mantener intacta la base de datos existente.
+27. Próximo trabajo
+SIGUIENTE TAREA:
 
-Probar el cambio.
+Implementar confirmación administrativa de pagos.
 
-Actualizar este documento con el nuevo estado.
+Flujo previsto:
 
-Última actualización: 16/09/2026
+Admin
+  ↓
+Introduce referencia
+  ↓
+Buscar Payment
+  ↓
+Mostrar datos del pago
+  ↓
+Verificar manualmente
+  ↓
+Confirmar
+  ↓
+Payment = PAID
+  ↓
+User = ACTIVE
+  ↓
+Calcular vencimiento
+
+Estado actual del proyecto:
+
+Sistema de registro       → COMPLETADO
+Sistema de suscripción    → COMPLETADO
+Sistema de solicitudes    → COMPLETADO
+Sistema QR                → COMPLETADO
+Confirmación de pagos     → SIGUIENTE TAREA

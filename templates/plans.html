@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Planes — BTC Alerts</title>
+
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <header class="navbar">
+        <div class="container nav-content">
+
+            <a href="/" class="logo">
+                ₿ BTC Alerts
+            </a>
+
+            <nav class="nav-links">
+                <a href="/dashboard">Dashboard</a>
+                <a href="#" id="logout-link">Cerrar sesión</a>
+            </nav>
+
+        </div>
+    </header>
+
+
+    <main class="dashboard-page">
+
+        <div class="container">
+
+            <div class="dashboard-header">
+
+                <div>
+                    <p class="dashboard-label">
+                        BTC ALERTS
+                    </p>
+
+                    <h1>Elige tu plan</h1>
+
+                    <p>
+                        Selecciona el plan que deseas activar.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <section class="plans-grid" id="plans-container">
+
+                <p>Cargando planes...</p>
+
+            </section>
+
+        </div>
+
+    </main>
+
+
+    <footer class="footer">
+
+        <div class="container">
+
+            <p>
+                © 2026 BTC Alerts. Todos los derechos reservados.
+            </p>
+
+        </div>
+
+    </footer>
+
+
+    <script>
+
+        async function loadPlans() {
+
+            try {
+
+                const response = await fetch("/plans");
+
+                if (!response.ok) {
+                    throw new Error("No se pudieron cargar los planes");
+                }
+
+                const plans = await response.json();
+
+                const container =
+                    document.getElementById("plans-container");
+
+                container.innerHTML = "";
+
+
+                for (const [planId, plan] of Object.entries(plans)) {
+
+                    const card =
+                        document.createElement("div");
+
+                    card.className = "dashboard-card";
+
+                    const duration =
+                        plan.months === null
+                            ? "Sin vencimiento"
+                            : `${plan.months} mes${plan.months > 1 ? "es" : ""}`;
+
+
+                    card.innerHTML = `
+                        <div class="card-icon">
+                            💳
+                        </div>
+
+                        <h2>${plan.name}</h2>
+
+                        <div class="dashboard-info">
+
+                            <div>
+                                <span>Duración</span>
+                                <strong>${duration}</strong>
+                            </div>
+
+                            <div>
+                                <span>Precio</span>
+                                <strong>${plan.price_usdt} USDT</strong>
+                            </div>
+
+                            <div>
+                                <span>Equivalente</span>
+                                <strong>${plan.price_bob} Bs</strong>
+                            </div>
+
+                        </div>
+
+                        <button
+                            class="btn btn-primary btn-full"
+                            onclick="selectPlan('${planId}')"
+                        >
+                            Seleccionar plan
+                        </button>
+                    `;
+
+                    container.appendChild(card);
+                }
+
+            } catch (error) {
+
+                document.getElementById(
+                    "plans-container"
+                ).innerHTML = `
+                    <p>
+                        No se pudieron cargar los planes.
+                    </p>
+                `;
+
+            }
+
+        }
+
+
+        function selectPlan(planId) {
+
+            window.location.href =
+                `/subscribe/${planId}`;
+
+        }
+
+
+        document.getElementById("logout-link")
+            .addEventListener("click", async function(event) {
+
+                event.preventDefault();
+
+                await fetch("/auth/logout", {
+                    method: "POST"
+                });
+
+                window.location.href = "/login";
+
+            });
+
+
+        loadPlans();
+
+    </script>
+
+</body>
+</html>

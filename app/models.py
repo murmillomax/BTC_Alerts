@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import Boolean, DateTime, Integer, String, Numeric
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -64,4 +64,65 @@ class User(Base):
         Boolean,
         default=True,
         nullable=False
+    )
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    reference: Mapped[str] = mapped_column(
+        String(8),
+        unique=True,
+        index=True,
+        nullable=False
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        index=True
+    )
+
+    plan_id: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False
+    )
+
+    amount: Mapped[float] = mapped_column(
+        Numeric(12, 2),
+        nullable=False
+    )
+
+    currency: Mapped[str] = mapped_column(
+        String(10),
+        default="USDT",
+        nullable=False
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="PENDING",
+        nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True
+    )
+
+    paid_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True
     )

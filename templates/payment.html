@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Pago — BTC Alerts</title>
+
+    <link rel="stylesheet" href="/static/style.css">
+
+    <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap"
+    >
+</head>
+
+<body>
+
+    <header class="navbar">
+        <div class="container nav-content">
+
+            <a href="/" class="logo">
+                ₿ BTC Alerts
+            </a>
+
+            <nav class="nav-links">
+                <a href="/dashboard">Dashboard</a>
+                <a href="#" id="logout-link">Cerrar sesión</a>
+            </nav>
+
+        </div>
+    </header>
+
+
+    <main class="dashboard-page">
+
+        <div class="container">
+
+            <div class="dashboard-header">
+
+                <div>
+                    <p class="dashboard-label">
+                        BTC ALERTS
+                    </p>
+
+                    <h1>Realizar pago</h1>
+
+                    <p>
+                        Completa el pago para activar tu suscripción.
+                    </p>
+                </div>
+
+            </div>
+
+
+            <section class="dashboard-card">
+
+                <div class="card-icon">
+                    💳
+                </div>
+
+                <h2 id="plan-name">
+                    Cargando...
+                </h2>
+
+
+                <div class="dashboard-info">
+
+                    <div>
+                        <span>Duración</span>
+                        <strong id="plan-duration">-</strong>
+                    </div>
+
+                    <div>
+                        <span>Precio</span>
+                        <strong id="plan-usdt">-</strong>
+                    </div>
+
+                    <div>
+                        <span>Equivalente</span>
+                        <strong id="plan-bob">-</strong>
+                    </div>
+
+                </div>
+
+
+                <hr>
+
+
+                <h3>Referencia de pago</h3>
+
+                <p>
+                    Usa esta referencia para identificar tu pago:
+                </p>
+
+                
+                <div
+                    id="reference"
+                    style="
+                        font-family: 'Fira Code', monospace;
+                        font-variant-numeric: slashed-zero;
+                        font-size: 32px;
+                        font-weight: 800;
+                        text-align: center;
+                        letter-spacing: 6px;
+                        padding: 20px 25px;
+                        margin: 20px 0;
+                        width: 45%;
+                        min-width: 260px;
+                        border: 3px solid;
+                        border-radius: 12px;
+                    "
+                >
+                    -
+                </div>
+
+
+                <h3>Realiza el pago</h3>
+
+                <p>
+                    Escanea el código QR correspondiente al plan y
+                    realiza el pago por el importe indicado.
+                </p>
+
+                
+                <div class="payment-qr">
+                    <p>QR del plan</p>
+
+                    <img
+                        id="payment-qr-image"
+                        src=""
+                        alt="QR de pago"
+                        style="
+                            display: block;
+                            max-width: 320px;
+                            width: 100%;
+                            height: auto;
+                            margin: 20px 0;
+                        "
+                    >
+                </div>
+
+
+                <div class="payment-instructions">
+
+                    <p>
+                        Después de realizar el pago, conserva tu
+                        comprobante.
+                    </p>
+
+                    <p>
+                        La activación será realizada después de
+                        comprobar el pago.
+                    </p>
+
+                </div>
+
+
+                <div class="payment-status">
+
+                    <strong>Estado:</strong>
+
+                    <span id="payment-status">
+                        PENDIENTE
+                    </span>
+
+                </div>
+
+
+                <a
+                    href="/dashboard"
+                    class="btn btn-primary btn-full"
+                >
+                    Volver al Dashboard
+                </a>
+
+            </section>
+
+        </div>
+
+    </main>
+
+
+    <footer class="footer">
+
+        <div class="container">
+
+            <p>
+                © 2026 BTC Alerts. Todos los derechos reservados.
+            </p>
+
+        </div>
+
+    </footer>
+
+    <script type="application/json" id="payment-data">
+        {{ payment | tojson }}
+    </script>
+
+    <script>
+
+        const paymentData = JSON.parse(
+            document.getElementById("payment-data").textContent
+        );
+
+        function loadPayment() {
+
+            const plan = paymentData.plan;
+
+            const qrFiles = {
+                monthly: "/static/qr/bcp_monthly.jpg",
+                semiannual: "/static/qr/bcp_semiannual.jpg",
+                annual: "/static/qr/bcp_annual.jpg",
+                lifetime: "/static/qr/bcp_lifetime.jpg"
+            };
+
+            document.getElementById("payment-qr-image").src =
+                qrFiles[paymentData.plan_id];       
+
+            document.getElementById("plan-name").textContent =
+                plan.name;
+
+            document.getElementById("plan-usdt").textContent =
+                `${plan.price_usdt} USDT`;
+
+            document.getElementById("plan-bob").textContent =
+                `${plan.price_bob} Bs`;
+            //
+            document.getElementById("reference").textContent =
+                paymentData.reference;
+
+            document.getElementById("payment-status").textContent =
+                paymentData.status;
+
+
+            if (plan.months === null) {
+
+                document.getElementById("plan-duration")
+                    .textContent = "Sin vencimiento";
+
+            } else {
+
+                document.getElementById("plan-duration")
+                    .textContent =
+                    `${plan.months} mes${plan.months > 1 ? "es" : ""}`;
+
+            }
+
+        }
+
+
+        document.getElementById("logout-link")
+            .addEventListener("click", async function(event) {
+
+                event.preventDefault();
+
+                await fetch("/auth/logout", {
+                    method: "POST"
+                });
+
+                window.location.href = "/login";
+
+            });
+
+
+        loadPayment();
+
+    </script>
+
+</body>
+</html>
