@@ -977,3 +977,154 @@ Existe PENDING de otro plan
       Crear nuevo PENDING
 No se debe eliminar ninguna solicitud histórica de la base de datos.
 
+
+---
+
+# 32. Actualización del proyecto — 13/10/2026
+
+## 32.1 Autenticación y seguridad de cuentas
+
+Estado: IMPLEMENTADO Y PROBADO LOCALMENTE
+
+Se añadieron o ajustaron las siguientes funciones:
+
+- Inicio de sesión mediante código enviado por correo.
+- Recuperación de contraseña mediante código de correo.
+- Cambio y restablecimiento de contraseña sujetos a una espera de 24 horas.
+- Códigos con validez de 15 minutos.
+- Límite de 60 segundos entre solicitudes de código.
+- Máximo de 5 intentos de código.
+- Reenvío de código de verificación mediante POST /auth/resend-verification.
+- Botón para reenviar el código en verify-email.html.
+
+Archivo principal:
+app/auth.py
+
+Archivos relacionados:
+app/email.py
+templates/login.html
+templates/verify-email.html
+
+## 32.2 Registro de cuentas existentes
+
+Estado: IMPLEMENTADO Y PROBADO LOCALMENTE
+
+Se modificó la función register() en app/auth.py.
+
+Comportamiento actual:
+
+- Correo nuevo: crea una cuenta y envía el código de verificación.
+- Correo existente verificado: rechaza el registro e indica iniciar sesión o recuperar la contraseña.
+- Correo existente sin verificar: reutiliza la cuenta y permite solicitar otro código respetando el límite de 60 segundos.
+- No cambia la contraseña de una cuenta existente durante un nuevo intento de registro.
+- No crea usuarios duplicados.
+- Conserva los datos existentes de usuario y suscripción.
+
+Comprobación:
+python -m py_compile .\app\auth.py
+
+Resultado: sin errores de sintaxis.
+
+## 32.3 Interfaz de registro
+
+Estado: PENDIENTE
+
+Situación comprobada:
+
+- Los enlaces «Registrarse» aparecen en la interfaz.
+- GET /register devuelve 404.
+- No existe templates/register.html.
+- El registro se ha realizado mediante POST /auth/register en /docs.
+
+Trabajo pendiente:
+
+Crear la ruta GET /register y la plantilla de registro con:
+
+- Nombre.
+- Apellido.
+- Correo electrónico.
+- Contraseña.
+- Confirmación de contraseña.
+
+La interfaz debe utilizar el endpoint existente POST /auth/register y mostrar mensajes comprensibles para el usuario.
+
+Antes de añadir nombre y apellido al modelo User, revisar app/models.py y preparar una migración compatible con la base de datos existente.
+
+No recrear la base de datos.
+
+## 32.4 Cuentas de prueba
+
+Se identificaron las cuentas:
+
+ID 1: prueba@example.com
+ID 2: prueba2@example.com
+
+Ambas eran cuentas de prueba sin pagos asociados y sin acceso a los correos.
+
+Se eliminaron mediante una operación controlada después de comprobar que no tenían pagos asociados.
+
+La copia de seguridad de la base de datos creada antes de esa eliminación es:
+
+btc_alerts.before_test_cleanup.db
+
+Se conservaron los ID restantes. No renumerar usuarios.
+
+## 32.5 Estado de las cuentas después de la limpieza
+
+Según el último inventario realizado:
+
+ID 3: daltonmax29@gmail.com — verificado, TRIAL.
+ID 4: daltonmax_29@hotmail.com — verificado, TRIAL.
+ID 5: daltonmax_42@hotmail.com — verificado, TRIAL.
+ID 6: app.btc.alerts@gmail.com — verificado, administrador, TRIAL.
+ID 7: daltonmax24@gmail.com — verificado, administrador, TRIAL.
+ID 8: daltonmax_24@hotmail.com — pendiente de verificación, PENDING.
+
+Verificar nuevamente estos datos antes de realizar operaciones futuras sobre cuentas.
+
+## 32.6 Copias de seguridad creadas
+
+Archivo de autenticación anterior al ajuste del registro:
+
+app/auth.py.before_register_fix.bak
+
+Copia adicional de autenticación:
+
+app/auth.py.before_register_fix_second.bak
+
+Copia de la base de datos anterior a la eliminación de cuentas de prueba:
+
+btc_alerts.before_test_cleanup.db
+
+Copia de este documento antes de la actualización:
+
+PROJECT_STATUS.before_2026-10-13.bak
+
+No borrar estas copias sin una decisión explícita.
+
+## 32.7 Próximas tareas
+
+Prioridad funcional original:
+
+1. Proteger el cambio de plan cuando exista un pago PENDING con user_reported_paid = True.
+2. Restringir correctamente las funciones para suscripciones EXPIRED.
+3. Completar el historial administrativo de pagos.
+4. Enviar correo de confirmación tras la aprobación administrativa de un pago.
+
+Siguiente mejora de interfaz:
+
+5. Crear la página /register con nombre y apellido, correo, contraseña y confirmación.
+6. Revisar el modelo User y aplicar una migración segura para los campos nuevos, si corresponde.
+
+Mantener el orden de prioridades y no eliminar el historial de pagos.
+
+## 32.8 Reglas de continuidad
+
+- No eliminar ni recrear btc_alerts.db.
+- No reiniciar los ID de usuarios.
+- No borrar el historial de pagos.
+- Crear copias de seguridad antes de cambios importantes.
+- Realizar cambios pequeños y probarlos.
+- Mantener las funciones previamente probadas.
+- Actualizar PROJECT_STATUS.md después de cada avance importante.
+

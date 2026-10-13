@@ -5,6 +5,53 @@ from .database import engine
 
 def migrate():
     with engine.begin() as conn:
+        # Campos para acceso por correo y recuperación de contraseña
+        columns = conn.execute(
+            text("PRAGMA table_info(users)")
+        ).fetchall()
+
+        user_columns = {column[1] for column in columns}
+
+        new_columns = {
+            "login_code": "VARCHAR(10)",
+            "login_code_expires": "DATETIME",
+            "reset_code": "VARCHAR(10)",
+            "reset_code_expires": "DATETIME",
+            "login_requested_at": "DATETIME",
+            "login_attempts": "INTEGER NOT NULL DEFAULT 0",
+            "reset_requested_at": "DATETIME",
+            "reset_attempts": "INTEGER NOT NULL DEFAULT 0",
+        }
+
+        for column_name, column_type in new_columns.items():
+            if column_name not in user_columns:
+                conn.execute(
+                    text(
+                        f"ALTER TABLE users "
+                        f"ADD COLUMN {column_name} {column_type}"
+                    )
+                )
+                print(f"Agregada: users.{column_name}")
+            else:
+                print(f"Ya existe: users.{column_name}")
+
+        # users.password_changed_at
+        columns = conn.execute(
+            text("PRAGMA table_info(users)")
+        ).fetchall()
+
+        user_columns = {column[1] for column in columns}
+
+        if "password_changed_at" not in user_columns:
+            conn.execute(
+                text("""
+                    ALTER TABLE users
+                    ADD COLUMN password_changed_at DATETIME
+                """)
+            )
+            print("Agregada: users.password_changed_at")
+        else:
+            print("Ya existe: users.password_changed_at")
         # users.subscription_started
         columns = conn.execute(
             text("PRAGMA table_info(users)")

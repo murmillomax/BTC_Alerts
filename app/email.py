@@ -52,3 +52,59 @@ BTC Alerts
         server.starttls()
         server.login(SMTP_USERNAME, SMTP_PASSWORD)
         server.send_message(message)
+
+def _send_auth_code_email(
+    recipient: str,
+    code: str,
+    purpose: str
+):
+    if not SMTP_USERNAME or not SMTP_PASSWORD:
+        raise RuntimeError(
+            "SMTP_USERNAME o SMTP_PASSWORD no están configurados"
+        )
+
+    if purpose == "login":
+        subject = "BTC Alerts - Código de acceso"
+        action = "iniciar sesión"
+    elif purpose == "reset":
+        subject = "BTC Alerts - Recuperación de contraseña"
+        action = "restablecer tu contraseña"
+    else:
+        raise ValueError("Tipo de correo no válido")
+
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = SMTP_FROM
+    message["To"] = recipient
+
+    message.set_content(
+        f"""Hola,
+
+Recibimos una solicitud para {action} en BTC Alerts.
+
+Tu código de seguridad es:
+
+{code}
+
+Este código vence en 15 minutos y solo debe utilizarse
+para la operación que solicitaste.
+
+Si no realizaste esta solicitud, ignora este mensaje.
+No compartas el código con nadie.
+
+BTC Alerts
+"""
+    )
+
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        server.starttls()
+        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        server.send_message(message)
+
+
+def send_login_code_email(recipient: str, code: str):
+    _send_auth_code_email(recipient, code, "login")
+
+
+def send_password_reset_email(recipient: str, code: str):
+    _send_auth_code_email(recipient, code, "reset")

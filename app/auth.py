@@ -13,9 +13,18 @@ from sqlalchemy.orm import Session
 from .database import SessionLocal
 from .models import User
 
-from .email import send_verification_email
+from .email import (
+    send_verification_email,
+    send_login_code_email,
+    send_password_reset_email,
+)
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
+
+CODE_MINUTES = 15
+REQUEST_COOLDOWN_SECONDS = 60
+MAX_CODE_ATTEMPTS = 5
+PASSWORD_COOLDOWN_HOURS = 24
 
 
 def get_db():
@@ -25,15 +34,175 @@ def get_db():
     finally:
         db.close()
 
-#--------------- Register ----------------------
+
+# ---------------- Validaciones compartidas ----------------
+
+def validate_new_password(password: str, confirmation: str):
+    if password != confirmation:
+        raise HTTPException(
+            status_code=400,
+            detail="Las nuevas contraseñas no coinciden"
+        )
+
+    password_bytes = password.encode("utf-8")
+
+    if len(password_bytes) < 8:
+        raise HTTPException(
+            status_code=400,
+            detail="La contraseña debe tener al menos 8 bytes"
+        )
+
+    if len(password_bytes) > 72:
+        raise HTTPException(
+            status_code=400,
+            detail="La contraseña supera el límite de 72 bytes"
+        )
+
+    return password_bytes
+
+
+def check_password_cooldown(user: User):
+    if user.password_changed_at is None:
+        return
+
+    now = utc_now()
+    elapsed = now - user.password_changed_at
+    cooldown = timedelta(hours=PASSWORD_COOLDOWN_HOURS)
+
+    if elapsed < cooldown:
+        remaining = cooldown - elapsed
+        total_seconds = int(remaining.total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "Por seguridad, no puedes cambiar ni restablecer "
+                "la contraseña durante las 24 horas posteriores "
+                "al último cambio. "
+                f"Tiempo restante aproximado: {hours} h {minutes} min."
+            )
+        )
+
+
+def code_is_valid(code: str | None, expires) -> bool:
+    return bool(
+        code
+        and expires
+        and utc_now() <= expires
+    )
+
+
+def generate_code() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+# ---------------- Modelos de solicitud ----------------
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
-#--------------- Login ----------------------
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
-#--------------- Register ----------------------
+
+
+class EmailRequest(BaseModel):
+    email: EmailStr
+
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    verification_code: str
+
+
+class CodeLoginRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    code: str
+    new_password: str
+    confirm_password: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str
+
+
+# ---------------- Cambiar contraseña con sesión ----------------
+
+@router.post("/change-password")
+def change_password(
+    data: ChangePasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    user_id = request.session.get("user_id")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Debes iniciar sesión para cambiar tu contraseña"
+        )
+
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        request.session.clear()
+        raise HTTPException(
+            status_code=401,
+            detail="Usuario no encontrado. Inicia sesión nuevamente"
+        )
+
+    try:
+        password_ok = bcrypt.checkpw(
+            data.current_password.encode("utf-8"),
+            user.password_hash.encode("utf-8")
+        )
+    except (ValueError, TypeError):
+        password_ok = False
+
+    if not password_ok:
+        raise HTTPException(
+            status_code=400,
+            detail="La contraseña actual es incorrecta"
+        )
+
+    check_password_cooldown(user)
+
+    password_bytes = validate_new_password(
+        data.new_password,
+        data.confirm_password
+    )
+
+    if data.current_password == data.new_password:
+        raise HTTPException(
+            status_code=400,
+            detail="La nueva contraseña debe ser diferente"
+        )
+
+    user.password_hash = bcrypt.hashpw(
+        password_bytes,
+        bcrypt.gensalt()
+    ).decode("utf-8")
+
+    user.password_changed_at = utc_now()
+
+    db.commit()
+
+    return {"message": "Contraseña actualizada correctamente"}
+
+
+# ---------------- Registro ----------------
+
 @router.post("/register")
 def register(
     data: RegisterRequest,
@@ -44,21 +213,79 @@ def register(
     ).first()
 
     if existing_user:
+        if existing_user.email_verified:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "El email ya está registrado. "
+                    "Inicia sesión o recupera tu contraseña."
+                )
+            )
+
+        # La cuenta existe, pero todavía no verificó el correo.
+        # No cambiar la contraseña ni crear otra cuenta.
+        generic_message = (
+            "La cuenta ya existe y necesita verificar su correo. "
+            "Si corresponde, recibirás un nuevo código."
+        )
+
+        now = utc_now()
+
+        # Respetar el límite de 60 segundos desde la solicitud anterior.
+        if existing_user.verification_expires:
+            previous_request = (
+                existing_user.verification_expires
+                - timedelta(minutes=CODE_MINUTES)
+            )
+
+            if now - previous_request < timedelta(
+                seconds=REQUEST_COOLDOWN_SECONDS
+            ):
+                return {"message": generic_message}
+
+        verification_code = generate_code()
+        existing_user.verification_code = verification_code
+        existing_user.verification_expires = (
+            now + timedelta(minutes=CODE_MINUTES)
+        )
+
+        db.commit()
+
+        try:
+            send_verification_email(
+                recipient=existing_user.email,
+                verification_code=verification_code
+            )
+        except Exception:
+            existing_user.verification_code = None
+            existing_user.verification_expires = None
+            db.commit()
+
+            raise HTTPException(
+                status_code=500,
+                detail="No se pudo enviar el correo de verificación"
+            )
+
+        return {
+            "message": generic_message,
+            "email": existing_user.email
+        }
+
+    password_bytes = data.password.encode("utf-8")
+
+    if len(password_bytes) < 8 or len(password_bytes) > 72:
         raise HTTPException(
             status_code=400,
-            detail="El email ya está registrado"
+            detail="La contraseña debe tener entre 8 y 72 bytes"
         )
 
     password_hash = bcrypt.hashpw(
-        data.password.encode("utf-8"),
+        password_bytes,
         bcrypt.gensalt()
     ).decode("utf-8")
 
-    verification_code = f"{secrets.randbelow(1000000):06d}"
-
-    verification_expires = (
-        utc_now() + timedelta(minutes=15)
-    )
+    verification_code = generate_code()
+    verification_expires = utc_now() + timedelta(minutes=CODE_MINUTES)
 
     user = User(
         email=data.email,
@@ -79,27 +306,24 @@ def register(
             recipient=user.email,
             verification_code=verification_code
         )
-    except Exception as e:
+    except Exception:
         db.delete(user)
         db.commit()
 
         raise HTTPException(
             status_code=500,
-            detail=f"No se pudo enviar el correo de verificación: {str(e)}"
+            detail="No se pudo enviar el correo de verificación"
         )
 
     return {
-        "message": "Usuario registrado correctamente. Revisa tu correo para verificar tu cuenta.",
+        "message": (
+            "Usuario registrado correctamente. "
+            "Revisa tu correo para verificar tu cuenta."
+        ),
         "user_id": user.id,
         "email": user.email
     }
-
-#--------------- Verify Email ----------------------
-
-class VerifyEmailRequest(BaseModel):
-    email: EmailStr
-    verification_code: str
-
+# ---------------- Verificar correo ----------------
 
 @router.post("/verify-email")
 def verify_email(
@@ -122,16 +346,10 @@ def verify_email(
             detail="El email ya está verificado"
         )
 
-    if not user.verification_code:
+    if not user.verification_code or not user.verification_expires:
         raise HTTPException(
             status_code=400,
-            detail="No existe un código de verificación"
-        )
-
-    if not user.verification_expires:
-        raise HTTPException(
-            status_code=400,
-            detail="El código de verificación no tiene fecha de expiración"
+            detail="No existe un código de verificación válido"
         )
 
     if utc_now() > user.verification_expires:
@@ -147,13 +365,10 @@ def verify_email(
         )
 
     user.email_verified = True
-
     user.subscription_status = "TRIAL"
-
     user.subscription_expires = (
         utc_now() + relativedelta(months=3)
     )
-
     user.verification_code = None
     user.verification_expires = None
 
@@ -161,14 +376,77 @@ def verify_email(
     db.refresh(user)
 
     return {
-        "message": "Email verificado correctamente. Tu período de prueba de 3 meses ha sido activado.",
+        "message": (
+            "Email verificado correctamente. "
+            "Tu período de prueba de 3 meses ha sido activado."
+        ),
         "user_id": user.id,
         "email": user.email,
         "subscription_status": user.subscription_status,
         "subscription_expires": user.subscription_expires
     }
 
-#--------------- Login -----------------------------
+# ---------------- Reenviar código de verificación ----------------
+
+@router.post("/resend-verification")
+def resend_verification(
+    data: EmailRequest,
+    db: Session = Depends(get_db)
+):
+    generic_message = (
+        "Si la cuenta existe y necesita verificar su correo, "
+        "recibirás un nuevo código."
+    )
+
+    user = db.query(User).filter(
+        User.email == data.email
+    ).first()
+
+    if not user or user.email_verified:
+        return {"message": generic_message}
+
+    now = utc_now()
+
+    # Evitar solicitudes repetidas durante 60 segundos.
+    if user.verification_expires:
+        previous_request = (
+            user.verification_expires
+            - timedelta(minutes=CODE_MINUTES)
+        )
+
+        if now - previous_request < timedelta(
+            seconds=REQUEST_COOLDOWN_SECONDS
+        ):
+            return {"message": generic_message}
+
+    code = generate_code()
+
+    user.verification_code = code
+    user.verification_expires = (
+        now + timedelta(minutes=CODE_MINUTES)
+    )
+
+    db.commit()
+
+    try:
+        send_verification_email(
+            recipient=user.email,
+            verification_code=code
+        )
+    except Exception:
+        user.verification_code = None
+        user.verification_expires = None
+        db.commit()
+
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo enviar el código. Inténtalo más tarde."
+        )
+
+    return {"message": generic_message}
+
+# ---------------- Login con contraseña ----------------
+
 @router.post("/login")
 def login(
     data: LoginRequest,
@@ -185,15 +463,24 @@ def login(
             detail="Email o contraseña incorrectos"
         )
 
-    password_ok = bcrypt.checkpw(
-        data.password.encode("utf-8"),
-        user.password_hash.encode("utf-8")
-    )
+    try:
+        password_ok = bcrypt.checkpw(
+            data.password.encode("utf-8"),
+            user.password_hash.encode("utf-8")
+        )
+    except (ValueError, TypeError):
+        password_ok = False
 
     if not password_ok:
         raise HTTPException(
             status_code=401,
             detail="Email o contraseña incorrectos"
+        )
+
+    if not user.email_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Debes verificar tu correo antes de iniciar sesión"
         )
 
     request.session["user_id"] = user.id
@@ -204,7 +491,261 @@ def login(
         "email": user.email,
         "subscription_status": user.subscription_status
     }
-#--------------- Me -----------------------------
+
+
+# ---------------- Solicitar código de acceso ----------------
+
+@router.post("/request-login-code")
+def request_login_code(
+    data: EmailRequest,
+    db: Session = Depends(get_db)
+):
+    generic_message = (
+        "Si la cuenta existe y está verificada, "
+        "recibirás un código por correo."
+    )
+
+    user = db.query(User).filter(
+        User.email == data.email
+    ).first()
+
+    if not user or not user.email_verified:
+        return {"message": generic_message}
+
+    now = utc_now()
+
+    if (
+        user.login_requested_at
+        and now - user.login_requested_at
+        < timedelta(seconds=REQUEST_COOLDOWN_SECONDS)
+    ):
+        return {"message": generic_message}
+
+    code = generate_code()
+
+    user.login_code = code
+    user.login_code_expires = now + timedelta(minutes=CODE_MINUTES)
+    user.login_requested_at = now
+    user.login_attempts = 0
+
+    db.commit()
+
+    try:
+        send_login_code_email(user.email, code)
+    except Exception:
+        user.login_code = None
+        user.login_code_expires = None
+        db.commit()
+
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo enviar el código. Inténtalo más tarde."
+        )
+
+    return {"message": generic_message}
+
+
+# ---------------- Entrar con código ----------------
+
+@router.post("/login-with-code")
+def login_with_code(
+    data: CodeLoginRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(
+        User.email == data.email
+    ).first()
+
+    if not user or not user.email_verified:
+        raise HTTPException(
+            status_code=400,
+            detail="Código inválido o expirado"
+        )
+
+    if user.login_attempts >= MAX_CODE_ATTEMPTS:
+        raise HTTPException(
+            status_code=429,
+            detail="Demasiados intentos. Solicita un código nuevo más tarde."
+        )
+
+    if not code_is_valid(user.login_code, user.login_code_expires):
+        user.login_code = None
+        user.login_code_expires = None
+        db.commit()
+
+        raise HTTPException(
+            status_code=400,
+            detail="Código inválido o expirado. Solicita uno nuevo."
+        )
+
+    if not secrets.compare_digest(data.code, user.login_code):
+        user.login_attempts += 1
+
+        if user.login_attempts >= MAX_CODE_ATTEMPTS:
+            user.login_code = None
+            user.login_code_expires = None
+
+        db.commit()
+
+        raise HTTPException(
+            status_code=400,
+            detail="Código inválido o expirado"
+        )
+
+    user.login_code = None
+    user.login_code_expires = None
+    user.login_attempts = 0
+    db.commit()
+
+    request.session["user_id"] = user.id
+
+    return {
+        "message": "Login correcto",
+        "user_id": user.id,
+        "email": user.email,
+        "subscription_status": user.subscription_status
+    }
+
+
+# ---------------- Solicitar recuperación ----------------
+
+@router.post("/request-password-reset")
+def request_password_reset(
+    data: EmailRequest,
+    db: Session = Depends(get_db)
+):
+    generic_message = (
+        "Si la cuenta existe y está verificada, "
+        "recibirás instrucciones por correo."
+    )
+
+    user = db.query(User).filter(
+        User.email == data.email
+    ).first()
+
+    if not user or not user.email_verified:
+        return {"message": generic_message}
+
+    now = utc_now()
+
+    if (
+        user.reset_requested_at
+        and now - user.reset_requested_at
+        < timedelta(seconds=REQUEST_COOLDOWN_SECONDS)
+    ):
+        return {"message": generic_message}
+
+    code = generate_code()
+
+    user.reset_code = code
+    user.reset_code_expires = now + timedelta(minutes=CODE_MINUTES)
+    user.reset_requested_at = now
+    user.reset_attempts = 0
+
+    db.commit()
+
+    try:
+        send_password_reset_email(user.email, code)
+    except Exception:
+        user.reset_code = None
+        user.reset_code_expires = None
+        db.commit()
+
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo enviar el código. Inténtalo más tarde."
+        )
+
+    return {"message": generic_message}
+
+
+# ---------------- Restablecer contraseña ----------------
+
+@router.post("/reset-password")
+def reset_password(
+    data: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(
+        User.email == data.email
+    ).first()
+
+    if not user or not user.email_verified:
+        raise HTTPException(
+            status_code=400,
+            detail="Código inválido o expirado"
+        )
+
+    if user.reset_attempts >= MAX_CODE_ATTEMPTS:
+        raise HTTPException(
+            status_code=429,
+            detail="Demasiados intentos. Solicita un código nuevo más tarde."
+        )
+
+    if not code_is_valid(user.reset_code, user.reset_code_expires):
+        user.reset_code = None
+        user.reset_code_expires = None
+        db.commit()
+
+        raise HTTPException(
+            status_code=400,
+            detail="Código inválido o expirado. Solicita uno nuevo."
+        )
+
+    if not secrets.compare_digest(data.code, user.reset_code):
+        user.reset_attempts += 1
+
+        if user.reset_attempts >= MAX_CODE_ATTEMPTS:
+            user.reset_code = None
+            user.reset_code_expires = None
+
+        db.commit()
+
+        raise HTTPException(
+            status_code=400,
+            detail="Código inválido o expirado"
+        )
+
+    # El bloqueo se comprueba después de validar el código.
+    check_password_cooldown(user)
+
+    password_bytes = validate_new_password(
+        data.new_password,
+        data.confirm_password
+    )
+
+    if bcrypt.checkpw(
+        password_bytes,
+        user.password_hash.encode("utf-8")
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="La nueva contraseña debe ser diferente"
+        )
+
+    user.password_hash = bcrypt.hashpw(
+        password_bytes,
+        bcrypt.gensalt()
+    ).decode("utf-8")
+
+    user.password_changed_at = utc_now()
+    user.reset_code = None
+    user.reset_code_expires = None
+    user.reset_attempts = 0
+
+    db.commit()
+
+    return {
+        "message": (
+            "Contraseña restablecida correctamente. "
+            "Ya puedes iniciar sesión con tu nueva contraseña."
+        )
+    }
+
+
+# ---------------- Usuario actual ----------------
+
 @router.get("/me")
 def get_current_user(
     request: Request,
@@ -224,6 +765,7 @@ def get_current_user(
 
     if not user:
         request.session.clear()
+
         raise HTTPException(
             status_code=401,
             detail="Usuario no encontrado"
@@ -236,11 +778,12 @@ def get_current_user(
         "subscription_expires": user.subscription_expires,
         "alerts_enabled": user.alerts_enabled
     }
-#--------------- Logout -----------------------------
+
+
+# ---------------- Cerrar sesión ----------------
+
 @router.post("/logout")
 def logout(request: Request):
     request.session.clear()
 
-    return {
-        "message": "Sesión cerrada correctamente"
-    }
+    return {"message": "Sesión cerrada correctamente"}

@@ -43,6 +43,57 @@ class User(Base):
         nullable=False
     )
 
+    password_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True
+    )
+
+    
+    # Código para inicio de sesión por correo
+    login_code: Mapped[str | None] = mapped_column(
+        String(10),
+        nullable=True
+    )
+
+    login_code_expires: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True
+    )
+
+    # Código independiente para recuperar la contraseña
+    reset_code: Mapped[str | None] = mapped_column(
+        String(10),
+        nullable=True
+    )
+
+    reset_code_expires: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True
+    )
+
+    # Protección contra solicitudes e intentos excesivos
+    login_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True
+    )
+
+    login_attempts: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False
+    )
+
+    reset_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True
+    )
+
+    reset_attempts: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,

@@ -97,6 +97,15 @@
                     Verificar email
                 </button>
 
+                <button
+                    type="button"
+                    id="resend-verification-btn"
+                    class="btn btn-full"
+                    style="margin-top: 10px;"
+                >
+                    Reenviar código de verificación
+                </button>
+
             </form>
 
 
@@ -211,6 +220,60 @@
 
         });
 
+        document.getElementById(
+            "resend-verification-btn"
+        ).addEventListener("click", async function() {
+
+            errorMessage.textContent = "";
+            successMessage.textContent = "";
+
+            const email = document.getElementById(
+                "email"
+            ).value.trim();
+
+            if (!email) {
+                errorMessage.textContent =
+                    "Introduce tu correo electrónico primero.";
+                return;
+            }
+
+            const button = this;
+            button.disabled = true;
+            button.textContent = "Enviando código...";
+
+            try {
+                const response = await fetch(
+                    "/auth/resend-verification",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            email: email
+                        })
+                    }
+                );
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    errorMessage.textContent =
+                        data.detail || "No se pudo enviar el código.";
+                    return;
+                }
+
+                successMessage.textContent = data.message;
+
+            } catch (error) {
+                errorMessage.textContent =
+                    "No se pudo conectar con el servidor.";
+            } finally {
+                button.disabled = false;
+                button.textContent =
+                    "Reenviar código de verificación";
+            }
+        });
     </script>
 
 </body>

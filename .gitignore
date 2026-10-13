@@ -31,3 +31,5 @@ testnet/
 # Sistema operativo
 .DS_Store
 Thumbs.db
+# Archivo privado con informacion sensible
+NOTAS.md

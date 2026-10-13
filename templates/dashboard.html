@@ -20,6 +20,7 @@
 
             <nav class="nav-links">
                 <a href="/">Inicio</a>
+                <a href="#change-password-section">Cambiar contraseña</a>
                 <a href="#" id="logout-link">Cerrar sesión</a>
             </nav>
 
@@ -177,7 +178,83 @@
                 </div>
 
             </section>
+            
+            <!-- SEGURIDAD: CAMBIAR CONTRASEÑA -->
 
+            <section class="signal-section" id="change-password-section">
+
+                <div class="section-header">
+                    <div>
+                        <p class="dashboard-label">SEGURIDAD</p>
+                        <h2>Cambiar contraseña</h2>
+                        <p>Actualiza la contraseña de tu cuenta.</p>
+                    </div>
+                </div>
+
+                <div class="dashboard-card">
+
+                    <form id="change-password-form">
+
+                        <div class="form-group">
+                            <label for="current-password">
+                                Contraseña actual
+                            </label>
+                            <input
+                                type="password"
+                                id="current-password"
+                                name="current_password"
+                                autocomplete="current-password"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="new-password">
+                                Nueva contraseña
+                            </label>
+                            <input
+                                type="password"
+                                id="new-password"
+                                name="new_password"
+                                minlength="8"
+                                autocomplete="new-password"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="confirm-password">
+                                Confirmar nueva contraseña
+                            </label>
+                            <input
+                                type="password"
+                                id="confirm-password"
+                                name="confirm_password"
+                                minlength="8"
+                                autocomplete="new-password"
+                                required
+                            >
+                        </div>
+
+                        <button
+                            type="submit"
+                            id="change-password-button"
+                            class="btn btn-primary btn-full"
+                        >
+                            Cambiar contraseña
+                        </button>
+
+                        <p
+                            id="change-password-message"
+                            role="status"
+                            aria-live="polite"
+                        ></p>
+
+                    </form>
+
+                </div>
+
+            </section>
 
             <!-- ÚLTIMA SEÑAL -->
 
@@ -397,6 +474,87 @@
 
             });
 
+        // Cambiar contraseña
+        document
+            .getElementById("change-password-form")
+            .addEventListener("submit", async function(event) {
+
+                event.preventDefault();
+
+                const currentPassword =
+                    document.getElementById("current-password").value;
+
+                const newPassword =
+                    document.getElementById("new-password").value;
+
+                const confirmPassword =
+                    document.getElementById("confirm-password").value;
+
+                const message =
+                    document.getElementById("change-password-message");
+
+                const button =
+                    document.getElementById("change-password-button");
+
+                message.textContent = "";
+                message.style.color = "";
+
+                if (newPassword !== confirmPassword) {
+                    message.textContent =
+                        "Las nuevas contraseñas no coinciden.";
+                    message.style.color = "#dc2626";
+                    return;
+                }
+
+                if (new TextEncoder().encode(newPassword).length > 72) {
+                    message.textContent =
+                        "La nueva contraseña supera el límite permitido.";
+                    message.style.color = "#dc2626";
+                    return;
+                }
+
+                button.disabled = true;
+                button.textContent = "Actualizando...";
+
+                try {
+                    const response = await fetch("/auth/change-password", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            current_password: currentPassword,
+                            new_password: newPassword,
+                            confirm_password: confirmPassword
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(
+                            result.detail || "No se pudo cambiar la contraseña."
+                        );
+                    }
+
+                    message.textContent =
+                        "Contraseña actualizada correctamente.";
+                    message.style.color = "#16a34a";
+
+                    document
+                        .getElementById("change-password-form")
+                        .reset();
+
+                } catch (error) {
+                    message.textContent = error.message ||
+                        "Error de conexión. Inténtalo nuevamente.";
+                    message.style.color = "#dc2626";
+
+                } finally {
+                    button.disabled = false;
+                    button.textContent = "Cambiar contraseña";
+                }
+            });
 
         loadDashboard();
 
